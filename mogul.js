@@ -34,40 +34,36 @@ function processTransaction(snapshot) {
 	var payerUID = snapshot.val().payer;
 	var payeeUID = snapshot.val().payee;
 	var amount = snapshot.val().amount;
+	var description = snapshot.val().description;
 	db.ref('/users/' + payerUID).on('value', function(snapshot) {
 		var payerAccID = snapshot.val().accountid;
 		db.ref('/users/' + payeeUID).on('value', function(snapshot) {
 			var payeeAccID = snapshot.val().accountid;
-			performTransaction(payerAccID, payeeAccID, amount);
+
+			var url = nessieURL + "/accounts/" + payerAccID + "/transfers" + "?key=" + nessieKey;
+			var datetime = new Date();
+			request.post(url)
+				.send({ "medium": "balance",
+						"payee_id": payeeAccID,
+						"amount": amount,
+						"description": description,
+						"transaction_date": datetime.toString()})
+				.end(function(err, res) {
+					console.log(res.status + ": " + url);
+				});
+
 		}); 
 	});
-}
-
-function performTransaction(payerAccID, payeeAccID, amount) {
-	var url = nessieURL + "/accounts/" + payerAccID + "/transfers" + "?key=" + nessieKey;
-	request.post(url)
-		.send({ "medium": "balance",
-				"payee_id": payeeAccID,
-				"amount": amount,
-				"transaction_date": "2016-07-06"})
-		.end(function(err, res) {
-			//console.log("Status: " + res.status);
-			//console.log(res.body);
-		});
 }
 
 function processBalanceRequest(snapshot) {
 	var requester = snapshot.val().requester;
 	db.ref('/users/' + requester).on('value', function(snapshot) {
 		var accountid = snapshot.val().accountid;
-		updateBalance(requester, accountid);
-	});
-}
-
-
-function updateBalance(requester, accountid) {
-	var url = nessieURL + "/accounts/" + accountid + "?key=" + nessieKey;
-	request.get(url).end(function(err, res) {
-		db.ref("/users").child(requester).update({"balance": res.body.balance});
+		var url = nessieURL + "/accounts/" + accountid + "?key=" + nessieKey;
+		request.get(url).end(function(err, res) {
+			console.log(res.status + ": " + url);
+			db.ref("/users").child(requester).update({"balance": res.body.balance});
+		});
 	});
 }
